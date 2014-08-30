@@ -1,25 +1,35 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 
 namespace YetAnotherDependencyInjector
 {
-    public class Injector
+    public static class Injector
     {
-        private static Dictionary<Type, Type> mappings
-            = new Dictionary<Type, Type>();
+        private static List<KeyValuePair<Type, Type>> mappings
+            = new List<KeyValuePair<Type, Type>>();
 
-        public static T Get<T>()
+        private static Dictionary<string, Type> stringMappingDependencies = new Dictionary<string, Type>();
+        private static int indexDependencies = 0;
+
+        public static void Register<T, V>(params string[] name) where V : T
         {
-            var type = typeof(T);
-            return (T)Get(type);
+            mappings.Add(new KeyValuePair<Type, Type>(typeof(T), typeof(V)));
+            if (name.Length == 0 || name.Length > 1) return;
+            stringMappingDependencies.Add(name.FirstOrDefault(), typeof(V));
         }
 
-        private static object Get(Type type)
+        public static T Get<T>(params string[] dependencies)
         {
-            var target = ResolveType(type);
+            var type = typeof(T);
+            return (T)Get(type, dependencies);
+        }
+
+        private static object Get(Type type, params string[] dependencies)
+        {
+            var target = ResolveType(type, dependencies);
+
             var constructor = target.GetConstructors()[0];
             var parameters = constructor.GetParameters();
 
@@ -27,30 +37,43 @@ namespace YetAnotherDependencyInjector
 
             foreach (var item in parameters)
             {
-                resolvedParameters.Add(Get(item.ParameterType));
+                resolvedParameters.Add(Get(item.ParameterType, dependencies));
             }
 
             return constructor.Invoke(resolvedParameters.ToArray());
         }
 
-        private static Type ResolveType(Type type)
+        private static Type ResolveType(Type type, string[] dependencies)
         {
-            if (mappings.Keys.Contains(type))
+            if (dependencies.Length > 0 && type.IsInterface)
             {
-                return mappings[type];
+                var mappedType = TryGetMappedTypeByArrayNames(type, dependencies);
+                indexDependencies++;
+                return mappedType;
             }
 
-            return type;
+            return mappings.FirstOrDefault(x => x.Key == type).Value ?? type;
         }
 
-        public static void Map<T, V>() where V : T
+        private static Type TryGetMappedTypeByArrayNames(Type type, string[] dependencies)
         {
-            mappings.Add(typeof(T), typeof(V));
+            Type mappedType;
+            stringMappingDependencies.TryGetValue(dependencies[indexDependencies], out mappedType);
+
+            if (mappedType == null)
+                throw new ArgumentException(String.Format("No components are registered with the name {0} to  interface {1}", dependencies[indexDependencies], type.Name));
+            if (!mappedType.GetTypeInfo().ImplementedInterfaces.Contains(type))
+                throw new ArgumentException(String.Format("The component named {0} not implement the interface {1}", dependencies[indexDependencies], type.Name));
+
+            return mappedType;
         }
 
         public static void Clear()
         {
             mappings.Clear();
+            stringMappingDependencies.Clear();
+            indexDependencies = 0;
         }
+
     }
 }
