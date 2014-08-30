@@ -61,9 +61,9 @@ namespace YetAnotherDependencyInjector
             stringMappingDependencies.TryGetValue(dependencies[indexDependencies], out mappedType);
 
             if (mappedType == null)
-                throw new ArgumentException(String.Format("No existen componentes registrados con el nombre {0} para la interfaz {1}", dependencies[indexDependencies], type.Name));
+                throw new ArgumentException(String.Format("No components are registered with the name {0} to  interface {1}", dependencies[indexDependencies], type.Name));
             if (!mappedType.GetTypeInfo().ImplementedInterfaces.Contains(type))
-                throw new ArgumentException(String.Format("El componente con nombre {0} no implementa la interfaz {1}", dependencies[indexDependencies], type.Name));
+                throw new ArgumentException(String.Format("The component named {0} not implement the interface {1}", dependencies[indexDependencies], type.Name));
 
             return mappedType;
         }
